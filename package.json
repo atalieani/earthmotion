@@ -1,0 +1,9 @@
+{
+  "name": "earthmotion-webgis",
+  "private": true,
+  "version": "0.1.0",
+  "description": "EarthMotion community disaster-risk reporting WebGIS — Phase 1 MVP.",
+  "scripts": {
+    "dev": "npx --yes serve -l 5173 ."
+  }
+}

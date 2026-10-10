@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex">
+<title>Moderation — EarthMotion</title>
+
+<link rel="stylesheet" href="../css/styles.css" />
+
+<!-- Stitch design: fonts, icons, Tailwind -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap" />
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+tailwind.config = {
+  theme: { extend: {
+    colors: {
+      surface: "#f0fdf2", "surface-container": "#e5f1e6", "surface-container-low": "#eaf7ec",
+      "surface-container-high": "#dfebe1", primary: "#004426", "primary-container": "#1a5d3a",
+      secondary: "#006d30", "on-surface": "#131e18", "on-surface-variant": "#404942", outline: "#707971"
+    },
+    fontFamily: { head: ["Poppins", "sans-serif"], body: ["Plus Jakarta Sans", "sans-serif"] }
+  } }
+};
+</script>
+
+<style>
+  html, body { margin: 0; }
+
+  /* Review queue: the table rendered by js/admin.js becomes a stack of cards, one per report */
+  #queue-table { display: block; width: 100%; }
+  #queue-table thead { display: none; }
+  #queue-table tbody { display: flex; flex-direction: column; gap: .75rem; }
+  #queue-body tr { display: flex; flex-direction: column; gap: .5rem; padding: .75rem; background: #fff;
+                   border-radius: 1rem; box-shadow: 0 1px 3px rgba(27,49,36,.14); }
+  #queue-body td { display: block; padding: 0; border: 0; font-size: .875rem; word-break: break-word; }
+  #queue-body td:nth-child(n+2):nth-child(-n+5)::before { display: block; margin-bottom: .125rem;
+                   font-size: .6875rem; font-weight: 600; color: #707971; }
+  #queue-body td:nth-child(2)::before { content: "Category"; }
+  #queue-body td:nth-child(3)::before { content: "Description"; }
+  #queue-body td:nth-child(4)::before { content: "Submitted by"; }
+  #queue-body td:nth-child(5)::before { content: "Date"; }
+  #queue-body img { width: 100%; max-height: 14rem; object-fit: cover; border-radius: .75rem; }
+  #queue-body td:last-child { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+  #queue-body button { min-height: 2.75rem; padding: .5rem 1rem; border-radius: .75rem; border: 0; font-weight: 600;
+                       background: #004426; color: #fff; cursor: pointer; }
+  #queue-body button.em-btn-secondary { background: #e5f1e6; color: #131e18; }
+  #queue-body input, #queue-body textarea, #queue-body select { width: 100%; padding: .5rem .75rem; border: 0;
+                       border-radius: .5rem; background: #eaf7ec; font: inherit; }
+</style>
+</head>
+<body class="font-body bg-surface text-on-surface min-h-full">
+
+<header class="fixed top-0 inset-x-0 z-50 h-14 bg-primary-container text-white flex items-center justify-between gap-3 px-4">
+  <a href="../index.html" class="font-head font-semibold text-lg shrink-0">🌍 EarthMotion</a>
+  <div class="em-auth min-w-0 flex items-center gap-2 text-xs whitespace-nowrap overflow-x-auto" id="auth-widget"></div>
+</header>
+
+<main class="pt-[4.5rem] pb-24 px-4 max-w-3xl mx-auto">
+
+  <div id="not-authorized" class="rounded-2xl bg-white p-5 shadow-sm" style="display:none;">
+    <h2 class="font-head font-semibold text-lg text-primary">Moderator access required</h2>
+    <p class="mt-2 text-sm text-on-surface-variant">This page is for the internal volunteer review team. Sign in with a moderator account to see the queue.</p>
+  </div>
+
+  <div id="queue-wrap" style="display:none;">
+
+    <div class="flex items-center gap-2">
+      <span class="material-symbols-outlined text-secondary" style="font-variation-settings:'FILL' 1">verified_user</span>
+      <h1 class="font-head font-semibold text-2xl text-primary">Moderation</h1>
+    </div>
+
+    <!-- Maintenance tools -->
+    <section class="mt-3 rounded-2xl bg-white p-4 shadow-sm">
+      <h2 class="font-head font-semibold text-base text-primary">Maintenance</h2>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button type="button" id="flag-stale-btn" class="px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold active:scale-95 transition-transform">Flag stale reports for recheck</button>
+        <button type="button" id="recompute-badges-btn" class="px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold active:scale-95 transition-transform">Recompute regional/consistency badges</button>
+        <button type="button" id="export-csv-btn" class="em-btn-secondary px-4 py-2.5 rounded-xl bg-surface-container text-sm font-semibold active:scale-95 transition-transform">Export CSV</button>
+        <button type="button" id="export-geojson-btn" class="em-btn-secondary px-4 py-2.5 rounded-xl bg-surface-container text-sm font-semibold active:scale-95 transition-transform">Export GeoJSON</button>
+      </div>
+      <p id="maintenance-msg" class="mt-3 text-sm text-on-surface-variant empty:hidden"></p>
+    </section>
+
+    <!-- Pending reports -->
+    <h2 class="mt-6 mb-2 font-head font-semibold text-lg text-primary">Pending reports <span id="queue-count" class="font-normal text-on-surface-variant"></span></h2>
+    <table id="queue-table">
+      <thead>
+        <tr>
+          <th>Photo</th><th>Category</th><th>Description</th>
+          <th>Submitted by</th><th>Date</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="queue-body"></tbody>
+    </table>
+  </div>
+</main>
+
+<!-- Bottom navigation: Moderation is the active tab -->
+<nav class="fixed bottom-0 inset-x-0 z-50 h-16 bg-white shadow-[0_-4px_16px_rgba(27,49,36,.08)] flex items-center justify-around text-[11px] text-on-surface-variant">
+  <a href="../index.html" class="flex flex-col items-center gap-0.5 w-20">
+    <span class="px-4 py-0.5"><span class="material-symbols-outlined">map</span></span>Map
+  </a>
+  <a href="../submit.html" class="flex flex-col items-center gap-0.5 w-20">
+    <span class="px-4 py-0.5"><span class="material-symbols-outlined">add_a_photo</span></span>Report
+  </a>
+  <a href="../leaderboard.html" class="flex flex-col items-center gap-0.5 w-20">
+    <span class="px-4 py-0.5"><span class="material-symbols-outlined">trophy</span></span>Leaderboard
+  </a>
+  <a href="index.html" aria-current="page" class="flex flex-col items-center gap-0.5 w-20 text-primary font-bold">
+    <span class="px-4 py-0.5 rounded-full bg-surface-container-high"><span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">verified_user</span></span>Moderation
+  </a>
+</nav>
+
+<script type="module" src="../js/admin.js"></script>
+</body>
+</html>

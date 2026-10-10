@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex">
+<title>Report a hazard — EarthMotion</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="css/styles.css" />
+
+<!-- Stitch design: fonts, icons, Tailwind -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap" />
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+tailwind.config = {
+  theme: { extend: {
+    colors: {
+      surface: "#f0fdf2", "surface-container": "#e5f1e6", "surface-container-low": "#eaf7ec",
+      "surface-container-high": "#dfebe1", primary: "#004426", "primary-container": "#1a5d3a",
+      secondary: "#006d30", "secondary-container": "#92f5a4", "on-surface": "#131e18",
+      "on-surface-variant": "#404942", outline: "#707971", error: "#ba1a1a"
+    },
+    fontFamily: { head: ["Poppins", "sans-serif"], body: ["Plus Jakarta Sans", "sans-serif"] }
+  } }
+};
+</script>
+
+<style>
+  html, body { margin: 0; }
+
+  /* Wizard: only the active step is visible (js/submit.js toggles .active) */
+  .em-step { display: none; }
+  .em-step.active { display: block; }
+
+  /* Location pin map (Leaflet) */
+  #pin-map { height: 16rem; margin-top: .75rem; border-radius: .75rem; overflow: hidden; position: relative; z-index: 0; }
+
+  /* Hazard types rendered by js/submit.js, restyled as selectable cards */
+  #category-list { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+  #category-list > * { position: relative; display: flex; align-items: center; min-height: 3.5rem; padding: .75rem;
+                       border-radius: .75rem; background: #fff; color: #131e18; font-size: .875rem; font-weight: 600;
+                       box-shadow: 0 1px 3px rgba(27,49,36,.15); cursor: pointer; }
+  #category-list label { display: flex; align-items: center; gap: .5rem; width: 100%; cursor: pointer; }
+  #category-list input { position: absolute; opacity: 0; width: 0; height: 0; }
+  #category-list > *:has(input:checked) { background: #92f5a4; color: #007233; box-shadow: 0 0 0 2px #1a5d3a; }
+  #category-list > *:has(input:focus-visible) { outline: 2px solid #1a5d3a; outline-offset: 2px; }
+</style>
+</head>
+<body class="font-body bg-surface text-on-surface min-h-full">
+
+<header class="fixed top-0 inset-x-0 z-50 h-14 bg-primary-container text-white flex items-center justify-between gap-3 px-2">
+  <div class="flex items-center min-w-0">
+    <button type="button" onclick="history.back()" aria-label="Go back" class="w-11 h-11 flex items-center justify-center active:scale-95 transition-transform">
+      <span class="material-symbols-outlined">arrow_back</span>
+    </button>
+    <h1 class="font-head font-semibold text-lg truncate">Report a hazard</h1>
+  </div>
+  <div class="em-auth min-w-0 flex items-center gap-2 text-xs whitespace-nowrap overflow-x-auto pr-2" id="auth-widget"></div>
+</header>
+
+<main class="pt-[4.5rem] pb-24 px-4 max-w-xl mx-auto">
+
+  <div id="signin-required" class="rounded-2xl bg-white p-5 shadow-sm" style="display:none;">
+    <h2 class="font-head font-semibold text-lg text-primary">Sign in to report a hazard</h2>
+    <p class="mt-2 text-sm text-on-surface-variant">Use the sign-in box in the header — we'll send you a one-time link by email, no password needed.</p>
+  </div>
+
+  <form id="submit-form" style="display:none;">
+    <!-- Progress (kept in sync with the active step by the script below) -->
+    <div class="mb-4">
+      <div class="flex items-center justify-between text-sm">
+        <span id="step-label" class="font-head font-semibold">Step 1 of 4</span>
+        <span id="step-title" class="text-on-surface-variant">Photo</span>
+      </div>
+      <div class="mt-2 h-1.5 rounded-full bg-surface-container overflow-hidden">
+        <div id="step-bar" class="h-full rounded-full bg-primary transition-all duration-300" style="width:25%"></div>
+      </div>
+    </div>
+
+    <!-- Step 1: photo -->
+    <div class="em-step active" data-step="1">
+      <h2 class="font-head font-semibold text-xl">Take a photo</h2>
+      <p class="mt-1 text-sm text-on-surface-variant">Use your camera to capture the hazard as it is now.</p>
+      <label for="photo-input" class="mt-3 flex flex-col items-center gap-2 p-6 rounded-2xl bg-white shadow-sm text-center cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary-container">
+        <span class="w-14 h-14 rounded-full bg-surface-container-low flex items-center justify-center text-primary">
+          <span class="material-symbols-outlined text-[30px]">add_a_photo</span>
+        </span>
+        <span class="font-semibold">Open camera</span>
+        <span class="text-sm text-on-surface-variant">Show the hazard clearly in the frame</span>
+        <input type="file" id="photo-input" accept="image/*" capture="environment" required class="sr-only" />
+      </label>
+      <img id="photo-preview" alt="Preview" class="mt-3 w-full max-h-72 object-cover rounded-2xl" />
+      <div class="em-step-nav mt-4 flex items-center justify-between gap-3">
+        <span></span>
+        <button type="button" class="em-next px-6 py-3 rounded-xl bg-primary text-white font-semibold active:scale-95 transition-transform" data-next="2">Next</button>
+      </div>
+    </div>
+
+    <!-- Step 2: location -->
+    <div class="em-step" data-step="2">
+      <h2 class="font-head font-semibold text-xl">Confirm the location</h2>
+      <p class="mt-1 text-sm text-on-surface-variant">Drag the pin if it's not quite right — GPS is auto-captured but isn't always precise.</p>
+      <button type="button" id="locate-btn" class="mt-3 w-full py-2.5 rounded-xl bg-surface-container text-primary font-semibold active:scale-95 transition-transform">📍 Use my location</button>
+      <div id="pin-map"></div>
+      <div class="em-step-nav mt-4 flex items-center justify-between gap-3">
+        <button type="button" class="em-back px-5 py-3 rounded-xl bg-surface-container font-semibold active:scale-95 transition-transform" data-back="1">Back</button>
+        <button type="button" class="em-next px-6 py-3 rounded-xl bg-primary text-white font-semibold active:scale-95 transition-transform" data-next="3">Next</button>
+      </div>
+    </div>
+
+    <!-- Step 3: hazard type + region -->
+    <div class="em-step" data-step="3">
+      <h2 class="font-head font-semibold text-xl">Hazard type</h2>
+      <div class="category-list mt-3" id="category-list"></div>
+      <label for="region-select" class="mt-4 block text-sm font-semibold text-on-surface-variant">Region (optional)</label>
+      <select id="region-select" class="mt-1 w-full rounded-xl bg-white px-3 py-2.5 text-sm shadow-sm">
+        <option value="">— not specified —</option>
+      </select>
+      <div class="em-step-nav mt-4 flex items-center justify-between gap-3">
+        <button type="button" class="em-back px-5 py-3 rounded-xl bg-surface-container font-semibold active:scale-95 transition-transform" data-back="2">Back</button>
+        <button type="button" class="em-next px-6 py-3 rounded-xl bg-primary text-white font-semibold active:scale-95 transition-transform" data-next="4">Next</button>
+      </div>
+    </div>
+
+    <!-- Step 4: description + submit -->
+    <div class="em-step" data-step="4">
+      <h2 class="font-head font-semibold text-xl">Description <span class="text-sm font-normal text-on-surface-variant">(optional)</span></h2>
+      <p class="mt-1 text-sm text-on-surface-variant">Adding a short description earns a small point bonus. Points are awarded once a moderator approves your report.</p>
+      <div class="mt-3 rounded-2xl bg-white p-3 shadow-sm">
+        <textarea id="description-input" rows="4" placeholder="What makes this a hazard?" class="w-full bg-transparent text-sm placeholder:text-outline focus:outline-none resize-none"></textarea>
+      </div>
+      <div id="nearby-warning" class="mt-3 text-sm empty:hidden"></div>
+      <div id="submit-error" class="em-error mt-3 text-sm text-error empty:hidden"></div>
+      <div class="em-step-nav mt-4 flex items-center justify-between gap-3">
+        <button type="button" class="em-back px-5 py-3 rounded-xl bg-surface-container font-semibold active:scale-95 transition-transform" data-back="3">Back</button>
+        <button type="submit" id="submit-btn" class="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-primary text-white font-bold shadow-md active:scale-95 transition-transform">
+          <span class="material-symbols-outlined text-[20px]">send</span>Submit report
+        </button>
+      </div>
+    </div>
+  </form>
+
+  <div id="submit-success" class="rounded-2xl bg-white p-5 shadow-sm" style="display:none;">
+    <h2 class="em-success font-head font-semibold text-xl text-primary">Report submitted 🎉</h2>
+    <p class="mt-2 text-sm text-on-surface-variant">It's now in the review queue. You'll see it on the public map once a moderator approves it, and your points update at that point.</p>
+    <div class="mt-4 flex flex-col gap-2">
+      <a class="text-center px-6 py-3 rounded-xl bg-primary text-white font-semibold" href="submit.html">Report another</a>
+      <a class="text-center px-6 py-3 rounded-xl bg-surface-container font-semibold" href="index.html">Back to map</a>
+    </div>
+  </div>
+</main>
+
+<!-- Bottom navigation: Report is the active tab -->
+<nav class="fixed bottom-0 inset-x-0 z-50 h-16 bg-white shadow-[0_-4px_16px_rgba(27,49,36,.08)] flex items-center justify-around text-[11px] text-on-surface-variant">
+  <a href="index.html" class="flex flex-col items-center gap-0.5 w-20">
+    <span class="px-4 py-0.5"><span class="material-symbols-outlined">map</span></span>Map
+  </a>
+  <a href="submit.html" aria-current="page" class="flex flex-col items-center gap-0.5 w-20 text-primary font-bold">
+    <span class="px-4 py-0.5 rounded-full bg-surface-container-high"><span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">add_a_photo</span></span>Report
+  </a>
+  <a href="leaderboard.html" class="flex flex-col items-center gap-0.5 w-20">
+    <span class="px-4 py-0.5"><span class="material-symbols-outlined">trophy</span></span>Leaderboard
+  </a>
+  <a href="admin/index.html" class="flex flex-col items-center gap-0.5 w-20">
+    <span class="px-4 py-0.5"><span class="material-symbols-outlined">verified_user</span></span>Moderation
+  </a>
+</nav>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="module" src="js/submit.js"></script>
+
+<script>
+  // Keep the progress bar in step with whichever .em-step js/submit.js marks active
+  const steps = [...document.querySelectorAll('.em-step')];
+  const titles = ['Photo', 'Location', 'Hazard type', 'Description'];
+  const label = document.getElementById('step-label');
+  const title = document.getElementById('step-title');
+  const bar = document.getElementById('step-bar');
+
+  function syncProgress() {
+    const i = Math.max(0, steps.findIndex(s => s.classList.contains('active')));
+    label.textContent = `Step ${i + 1} of ${steps.length}`;
+    title.textContent = titles[i];
+    bar.style.width = `${((i + 1) / steps.length) * 100}%`;
+    window.dispatchEvent(new Event('resize')); // lets the Leaflet pin map resize when step 2 appears
+  }
+
+  const observer = new MutationObserver(syncProgress);
+  steps.forEach(s => observer.observe(s, { attributes: true, attributeFilter: ['class'] }));
+  syncProgress();
+</script>
+</body>
+</html>
