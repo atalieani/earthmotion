@@ -3,7 +3,7 @@
 // areas, category/region/date filters, and an optional heatmap toggle.
 import { supabase } from './supabaseClient.js';
 import { mountAuthWidget, getSession } from './auth.js';
-import { hazardDivIcon, styleFor } from './hazards.js';
+import { hazardDivIcon, styleFor, iconHTML } from './hazards.js';
 import { DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM } from './config.js';
 
 mountAuthWidget(document.getElementById('auth-widget'));
@@ -38,7 +38,7 @@ async function loadFilterOptions() {
     return `
       <label>
         <input type="checkbox" value="${c.id}" checked />
-        <span style="color:${color}">${emoji}</span> ${escapeHtml(c.name)}
+        ${iconHTML(c.icon_key)} ${escapeHtml(c.name)}
       </label>`;
   }).join('');
   selectedCategoryIds = new Set(categories.map((c) => c.id));

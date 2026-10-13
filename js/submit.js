@@ -4,7 +4,7 @@
 // friendly error if either step fails without losing the user's work.
 import { supabase } from './supabaseClient.js';
 import { mountAuthWidget, getSession } from './auth.js';
-import { styleFor } from './hazards.js';
+import { styleFor, iconHTML } from './hazards.js';
 import { PHOTO_BUCKET, DEFAULT_MAP_CENTER } from './config.js';
 
 const state = {
@@ -97,7 +97,7 @@ async function loadCategoriesAndRegions() {
     return `
       <label>
         <input type="radio" name="category" value="${c.id}" data-icon="${c.icon_key}" />
-        <span style="color:${color}">${emoji}</span> ${escapeHtml(c.name)}
+        ${iconHTML(c.icon_key)} ${escapeHtml(c.name)}
       </label>`;
   }).join('');
   list.querySelectorAll('input[name="category"]').forEach((input) => {
